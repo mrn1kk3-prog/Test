@@ -17,6 +17,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
@@ -24,7 +26,7 @@ jobs:
         shell: bash
         run: |
           cat > source.b64 <<'PERSONALHEALTH_SOURCE'
-          H4sIAOro1GoC/+y9a28bSbIo2J/1K6oJzxlWN1UiqafVlj2yLbd1bFmCJLvP3EbDKJFJscxiFU89KHM8AuYeDC6wwAKLxVng4u63
+          H4sIANDq1GoC/+y9a28bSbIo2J/1K6oJzxlWN1UiqafVlj2yLbd1bFmCJLvP3EbDKJFJscxiFU89KHM8AuYeDC6wwAKLxVng4u63
           vWjcnzD7ff1P+pdsRGRmVWZVVpGUZU/PtIhui6zKjHxFRsYrI5w1Z+0PJ+7758zts+irz/Jp80/V33a7u5V/x+eddrez/pX1/qsv
           8EnjxI2g+a9+m59u1xon3pjtdbbvd9c72xub60575au7z2/k404ma5+7DdzU25ub+LezvdlW/2Z7vrPZ3drsdDbanU3c/1ubG19Z
           m19y/7uXLEjqJmrO+3/Qj/NroP/rG2X6372j/1+E/u+o9H99fXN7x9negX+37t+dAr8R+n+Ren7fuYzcvs+cURJ/jv2/tbFRRf/X
@@ -429,7 +431,7 @@ jobs:
           nRK7ZP28tVfXflAlZZMgQYIECRIkSJAgQYIECRIkSJAgQYIECRIkSJAgQYIECRIk/IHgf5uQ7y8AqAIA
           PERSONALHEALTH_SOURCE
           base64 --decode source.b64 > source.tar.gz
-          printf '5c75583da3a146cc5e873b76517865a9cc5eae6e2e0b1d4c58a438ce59c52d14  source.tar.gz\n' | sha256sum --check
+          printf 'd2d97e9a242906757835e46d8ecead0ecfac9f8727c721eb1d5b783c543d0e37  source.tar.gz\n' | sha256sum --check
           mkdir project
           tar -xzf source.tar.gz -C project
           chmod +x project/gradlew

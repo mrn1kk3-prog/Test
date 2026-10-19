@@ -3,7 +3,7 @@
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
     <application
         android:allowBackup="true"
-        android:label="Vibration Monitor"
+        android:label="Vibration Monitor v0.2"
         android:theme="@style/Theme.VibrationMonitor">
         <activity
             android:name=".MainActivity"

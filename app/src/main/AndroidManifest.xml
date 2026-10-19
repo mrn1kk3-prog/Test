@@ -3,10 +3,10 @@
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
     <application
         android:allowBackup="true"
-        android:label="Vibration Monitor v0.2"
+        android:label="Vibration Monitor v0.3"
         android:theme="@style/Theme.VibrationMonitor">
         <activity
-            android:name=".MainActivity"
+            android:name=".VibrationActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

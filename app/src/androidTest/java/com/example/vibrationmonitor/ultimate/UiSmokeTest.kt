@@ -18,10 +18,12 @@ class UiSmokeTest {
   ui.onNodeWithText("1X-esimerkki").performScrollTo().performClick()
   ui.waitUntil(timeoutMillis=30000){ui.onAllNodesWithText("SIMULOITU • 1X-esimerkki").fetchSemanticsNodes().isNotEmpty()}
   ui.onNodeWithText("FFT-spektri").performScrollTo().assertExists()
+  ui.onNodeWithText("Pyyhkäise ja nipistä",substring=true).performScrollTo()
   screenshot("spectrum")
   ui.onNodeWithText("Mahdollinen epätasapaino").performScrollTo().assertExists()
+  ui.onNodeWithText("Tarkista roottorin puhtaus",substring=true).performScrollTo()
   screenshot("diagnosis")
-  ui.onNodeWithText("Historia",useUnmergedTree=true).performClick()
+  ui.onNodeWithText("Data",useUnmergedTree=true).performClick()
   ui.onNodeWithText("SIMULOITU • 1X-esimerkki").assertExists()
   screenshot("history")
  }

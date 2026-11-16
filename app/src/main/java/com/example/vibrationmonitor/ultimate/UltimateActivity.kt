@@ -71,6 +71,7 @@ class UltimateActivity:ComponentActivity(){
   var cfg by remember{mutableStateOf(runCatching{config(JSONObject(prefs.getString("config","{}")!!))}.getOrDefault(Config()))}
   fun persist(){prefs.edit().putString("name",name).putString("machine",machine).putString("point",point).putString("mounting",mounting).putString("direction",direction).putString("notes",notes).putString("config",cfg.json().toString()).apply()}
   Panel("Mittauskohde"){
+   if(machines.isNotEmpty())Choices("Tallennetut koneet",machines.map{it.first},machine,!running){machine=it;persist()}
    Entry("Mittauksen nimi",name,!running){name=it;persist()};Entry("Kone",machine,!running){machine=it;persist()};Entry("Mittauspiste",point,!running){point=it;persist()};Entry("Suunta",direction,!running){direction=it;persist()};Entry("Kiinnitystapa",mounting,!running){mounting=it;persist()};Entry("Muistiinpanot",notes,!running){notes=it;persist()}
   }
   Panel("Asetukset"){

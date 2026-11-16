@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -27,13 +28,15 @@ class UltimateActivity:ComponentActivity(){
  private lateinit var store:Store;private lateinit var source:PhoneSource;private lateinit var capture:Capture
  private var records by mutableStateOf(emptyList<Record>());private var machines by mutableStateOf(emptyList<Pair<String,String>>())
  private var running by mutableStateOf(false);private var busy by mutableStateOf(false);private var status by mutableStateOf("")
+ private var firstSample = 0L
+ private var elapsed by mutableStateOf(0.0)
  private var live by mutableStateOf(emptyList<Raw>());private var selected by mutableStateOf<Record?>(null);private var result by mutableStateOf<Result?>(null);private var overlay by mutableStateOf<Result?>(null)
  private var tab by mutableStateOf(0);private var dark by mutableStateOf(true)
  private var pendingExport:((java.io.OutputStream)->Unit)?=null
  private val export=registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")){uri->if(uri!=null){val writer=pendingExport;lifecycleScope.launch(Dispatchers.IO){runCatching{contentResolver.openOutputStream(uri)!!.use{writer?.invoke(it)}}.onSuccess{withContext(Dispatchers.Main){status="Vienti valmis"}}.onFailure{withContext(Dispatchers.Main){status="Vienti epäonnistui: ${it.message}"}}}}}
  private val restore=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri->if(uri!=null)lifecycleScope.launch{busy=true;try{val count=withContext(Dispatchers.IO){val text=contentResolver.openInputStream(uri)!!.bufferedReader().use{it.readText()};store.restore(text)};refresh();status="Palautettu $count mittausta uusilla tunnisteilla"}catch(e:Exception){status="Palautus epäonnistui: ${e.message}"}finally{busy=false}}}
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);store=Store(applicationContext);source=PhoneSource(applicationContext);capture=Capture(store,source)
-  capture.onUpdate={values->runOnUiThread{live=values}}
+  capture.onUpdate={values->runOnUiThread{if(firstSample==0L)firstSample=values.first().t;elapsed=(values.last().t-firstSample)/1e9;live=values}}
   capture.onFinished={r,raw,s->lifecycleScope.launch{running=false;busy=true;window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);try{val a=withContext(Dispatchers.Default){runCatching{Dsp.analyze(raw,r.config,r.range,r.direction)}.getOrNull()};withContext(Dispatchers.IO){store.finish(r.id,a,if(a==null && s=="Valmis")"Liian vähän näytteitä" else s)};refresh();selected=records.find{it.id==r.id};result=a;tab=2;status="${selected?.name}: $s • ${raw.size} näytettä tallessa"}catch(e:Exception){status="Analyysi/tallennus epäonnistui: ${e.message}. Raakatiedosto säilytetty."}finally{busy=false}}}
   lifecycleScope.launch{withContext(Dispatchers.IO){store.recover()};refresh()}
   setContent{MaterialTheme(colorScheme=if(dark)darkColorScheme(primary=Color(0xFF55DAC8),secondary=Color(0xFF9ABEFF),background=Color(0xFF0B111C),surface=Color(0xFF131E2E))else lightColorScheme()){Surface(Modifier.fillMaxSize()){App()}}}
@@ -82,8 +85,8 @@ class UltimateActivity:ComponentActivity(){
    TextButton(onClick={cfg=config(JSONObject(prefs.getString("profile","{}")!!));persist()},enabled=!running){Text("Lataa profiili")}
   }
   Panel("Anturi"){Text(source.description());Text("Raaka kiihtyvyys; painovoiman DC poistetaan akselikohtaisesti. Analoginen kaistanleveys ei ole Android-metatiedoista varmennettavissa.")}
-  if(running){Panel("Mittaus käynnissä"){Text("X %.3f • Y %.3f • Z %.3f m/s²".format(live.lastOrNull()?.x?:0.0,live.lastOrNull()?.y?:0.0,live.lastOrNull()?.z?:0.0));val fs=if(live.size>1)(live.size-1)*1e9/(live.last().t-live.first().t)else 0.0;Text("Toteutunut näytetaajuus %.1f Hz".format(fs));Plot(live.mapIndexed{i,r->i.toDouble() to r.x},emptyList(),"näyte","X m/s²");Text("Näytön sulkeminen tai sovelluksen siirtäminen taustalle päättää mittauksen ja säilyttää datan.")}}
-  Button(onClick={if(running)capture.stop()else lifecycleScope.launch{busy=true;try{val r=withContext(Dispatchers.IO){store.create(name,machine,point,direction,mounting,notes,cfg,source.description(),source.sensor?.maximumRange?.toDouble()?:0.0)};live=emptyList();running=true;window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);capture.start(r);status="Mittaus käynnissä • automaattinen tallennus"}catch(e:Exception){running=false;status="Mittaus epäonnistui: ${e.message}"}finally{busy=false}}},enabled=!busy && (running || (name.isNotBlank() && machine.isNotBlank() && point.isNotBlank())),modifier=Modifier.fillMaxWidth()){Text(if(running)"Lopeta ja säilytä mittaus" else "Aloita mittaus")}
+  if(running){Panel("Mittaus käynnissä"){LinearProgressIndicator(progress={ (elapsed/cfg.seconds).toFloat().coerceIn(0f,1f) },modifier=Modifier.fillMaxWidth());Text("Kulunut %.1f s • jäljellä %.1f s".format(elapsed,(cfg.seconds-elapsed).coerceAtLeast(0.0)));val mean=live.map{it.x}.average().takeIf{it.isFinite()}?:0.0;val rms=sqrt(live.map{(it.x-mean).pow(2)}.average()).takeIf{it.isFinite()}?:0.0;Text("X RMS %.4f • Peak %.4f m/s² (viimeiset näytteet, DC poistettu)".format(rms,live.maxOfOrNull{abs(it.x-mean)}?:0.0));Text("X %.3f • Y %.3f • Z %.3f m/s²".format(live.lastOrNull()?.x?:0.0,live.lastOrNull()?.y?:0.0,live.lastOrNull()?.z?:0.0));val fs=if(live.size>1)(live.size-1)*1e9/(live.last().t-live.first().t)else 0.0;Text("Toteutunut näytetaajuus %.1f Hz".format(fs));Plot(live.mapIndexed{i,r->i.toDouble() to r.x},emptyList(),"näyte","X m/s²");Text("Näytön sulkeminen tai sovelluksen siirtäminen taustalle päättää mittauksen ja säilyttää datan.")}}
+  Button(onClick={if(running)capture.stop()else lifecycleScope.launch{busy=true;try{val r=withContext(Dispatchers.IO){store.create(name,machine,point,direction,mounting,notes,cfg,source.description(),source.sensor?.maximumRange?.toDouble()?:0.0)};live=emptyList();firstSample=0L;elapsed=0.0;running=true;window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);capture.start(r);status="Mittaus käynnissä • automaattinen tallennus"}catch(e:Exception){running=false;status="Mittaus epäonnistui: ${e.message}"}finally{busy=false}}},enabled=!busy && (running || (name.isNotBlank() && machine.isNotBlank() && point.isNotBlank())),modifier=Modifier.fillMaxWidth()){Text(if(running)"Lopeta ja säilytä mittaus" else "Aloita mittaus")}
  }
  @Composable private fun Analysis(){val r=selected;val a=result;if(r==null || a==null){Text("Valitse mittaus historiasta tai tee uusi mittaus.");return}
   var unit by remember{mutableStateOf("m/s²")};var log by remember{mutableStateOf(false)};var rmsMode by remember{mutableStateOf(false)};var cpm by remember{mutableStateOf(false)};var rename by remember(r.id){mutableStateOf(r.name)}
@@ -126,16 +129,18 @@ class UltimateActivity:ComponentActivity(){
 @Composable private fun Choices(label:String,options:List<String>,value:String,enabled:Boolean,onChange:(String)->Unit){Text(label,style=MaterialTheme.typography.labelLarge);Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){options.forEach{FilterChip(selected=it==value,onClick={onChange(it)},enabled=enabled,label={Text(it)})}}}
 private fun date(t:Long)=SimpleDateFormat("dd.MM.yyyy HH:mm:ss",Locale.getDefault()).format(Date(t))
 @Composable private fun Plot(points:List<Pair<Double,Double>>,other:List<Pair<Double,Double>>,xLabel:String,yLabel:String,order:Double=0.0){
- var zoom by remember(points){mutableStateOf(1f)};var pan by remember(points){mutableStateOf(0f)}
+ var zoom by remember(points){mutableStateOf(1f)};var pan by remember(points){mutableStateOf(0f)};var cursorA by remember(points){mutableStateOf<Double?>(null)};var cursorB by remember(points){mutableStateOf<Double?>(null)}
  val all=points+other;val maxX=(all.maxOfOrNull{it.first}?:1.0).coerceAtLeast(1e-9);val minY=min(0.0,all.minOfOrNull{it.second}?:0.0);val maxY=(all.maxOfOrNull{it.second}?:1.0).coerceAtLeast(minY+1e-9)
  Text("$yLabel • %.4g … %.4g".format(minY,maxY),style=MaterialTheme.typography.labelSmall)
- Canvas(Modifier.fillMaxWidth().height(210.dp).background(Color(0xFF0A1220),RoundedCornerShape(12.dp)).pointerInput(points){detectTransformGestures{_,p,z,_->zoom=(zoom*z).coerceIn(1f,20f);pan=(pan+p.x/size.width).coerceIn(1f-zoom,0f)}}){
+ Canvas(Modifier.fillMaxWidth().height(210.dp).background(Color(0xFF0A1220),RoundedCornerShape(12.dp)).pointerInput(points,zoom,pan){detectTapGestures{pos->val x=((pos.x/size.width-pan)/zoom*maxX).coerceIn(0.0,maxX);if(cursorA==null || cursorB!=null){cursorA=x;cursorB=null}else cursorB=x}}.pointerInput(points){detectTransformGestures{_,p,z,_->zoom=(zoom*z).coerceIn(1f,20f);pan=(pan+p.x/size.width).coerceIn(1f-zoom,0f)}}){
   for(i in 0..4){val y=size.height*i/4;drawLine(Color(0xFF253347),Offset(0f,y),Offset(size.width,y))}
   fun position(p:Pair<Double,Double>)=Offset(((p.first/maxX*zoom+pan)*size.width).toFloat(),(size.height*(1-(p.second-minY)/(maxY-minY)*.92)).toFloat())
   fun curve(data:List<Pair<Double,Double>>,color:Color){for(i in 1 until data.size){val a=position(data[i-1]);val b=position(data[i]);if(a.x>=0 && b.x<=size.width)drawLine(color,a,b,2f)}}
   if(order>0)for(i in 1..6){val x=((order*i/maxX*zoom+pan)*size.width).toFloat();if(x in 0f..size.width)drawLine(Color(0xFF596A96),Offset(x,0f),Offset(x,size.height),1f)}
-  curve(points,Color(0xFF55DAC8));curve(other,Color(0xFFFFB56B))
+  curve(points,Color(0xFF55DAC8));curve(other,Color(0xFFFFB56B));listOfNotNull(cursorA,cursorB).forEach{v->val x=((v/maxX*zoom+pan)*size.width).toFloat();if(x in 0f..size.width)drawLine(Color.White,Offset(x,0f),Offset(x,size.height),2f)}
  }
  Text("%.2f — %.2f $xLabel".format(-pan/zoom*maxX,(1-pan)/zoom*maxX),style=MaterialTheme.typography.labelSmall)
+ if(cursorA!=null){val nearest=points.minByOrNull{abs(it.first-cursorA!!)};Text("A %.3f $xLabel • %.5g $yLabel".format(cursorA,nearest?.second?:0.0),style=MaterialTheme.typography.labelSmall)}
+ if(cursorB!=null)Text("B %.3f • Δ %.3f $xLabel".format(cursorB,abs(cursorB!!-cursorA!!)),style=MaterialTheme.typography.labelSmall)
  if(order>0)Text("Pystyviivat: 1X–6X • 1X = %.2f $xLabel".format(order),style=MaterialTheme.typography.labelSmall)
 }

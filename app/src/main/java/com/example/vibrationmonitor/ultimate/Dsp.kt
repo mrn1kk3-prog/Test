@@ -3,7 +3,16 @@ package com.example.vibrationmonitor.ultimate
 import kotlin.math.*
 
 data class Raw(val t: Long, val x: Double, val y: Double, val z: Double)
-data class Config(val seconds: Int = 10, val rate: Int = 200, val fft: Int = 1024, val fmax: Double = 80.0, val highpass: Double = 5.0, val axis: Int = 0, val window: String = "Hann", val averages: Int = 8, val method: String = "RMS", val rpm: Double = 1500.0)
+data class Config(val seconds: Int = 10, val rate: Int = 200, val fft: Int = 1024, val fmax: Double = 80.0, val highpass: Double = 5.0, val axis: Int = 0, val window: String = "Hann", val averages: Int = 8, val method: String = "RMS", val rpm: Double = 1500.0) {
+ init {
+  require(seconds in 1..120 && rate in 20..1000)
+  require(fft in 64..32768 && fft and (fft-1)==0)
+  require(fmax.isFinite() && fmax>0 && highpass.isFinite() && highpass>0 && highpass<fmax)
+  require(axis in 0..3 && averages in 1..128 && rpm.isFinite() && rpm>=0)
+  require(window in listOf("Hann","Hamming","Blackman","Flat Top","Rectangular"))
+  require(method in listOf("RMS","Linear","Exponential"))
+ }
+}
 data class Finding(val title: String, val evidence: String, val confidence: String, val recommendation: String)
 data class Result(val fs: Double, val jitter: Double, val gaps: Int, val clipped: Boolean, val n: Int, val segments: Int, val f: DoubleArray, val peakSpectrum: DoubleArray, val psd: DoubleArray, val signal: DoubleArray, val rms: Double, val peak: Double, val p2p: Double, val kurtosis: Double, val skewness: Double, val velocity: Double, val warnings: List<String>, val findings: List<Finding>)
 object Dsp {

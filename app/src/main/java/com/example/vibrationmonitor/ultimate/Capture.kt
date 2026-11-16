@@ -17,7 +17,7 @@ class PhoneSource(context:Context):SampleSource,SensorEventListener{
  override fun onAccuracyChanged(s:Sensor?,accuracy:Int){}
  fun description()=sensor?.let{"${it.name} • ${it.vendor}\nAlue ±${it.maximumRange} m/s² • resoluutio ${it.resolution} m/s²\nMin/max viive ${it.minDelay}/${it.maxDelay} µs • ${it.power} mA"}?:"Kiihtyvyysanturia ei löydy"
 }
-class Capture(private val store:Store,private val source:PhoneSource){
+class Capture(private val store:Store,private val source:SampleSource){
  private var record:Record?=null;private var output:DataOutputStream?=null;private var fileStream:FileOutputStream?=null;private val samples=mutableListOf<Raw>();private var lastUpdate=0L
  var onUpdate:((List<Raw>)->Unit)?=null;var onFinished:((Record,List<Raw>,String)->Unit)?=null
  @Synchronized fun start(r:Record){check(record==null);record=r;samples.clear();lastUpdate=0;fileStream=FileOutputStream(store.file(r.id));output=DataOutputStream(BufferedOutputStream(fileStream));try{check(source.start(r.config.rate){sample(it)}){"Anturia ei voitu käynnistää"}}catch(e:Exception){stop("Epäonnistunut");throw e}}

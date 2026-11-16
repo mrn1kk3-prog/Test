@@ -22,4 +22,27 @@ class StoreTest{
  @Test fun deleteOnlySelectedMeasurement(){val a=record("A");val b=record("B");write(a.id);write(b.id);store.delete(a.id);assertEquals(b.id,store.list().single().id);assertTrue(store.file(b.id).exists());assertFalse(store.file(a.id).exists())}
  @Test fun corruptRestoreIsAtomic(){val r=record();write(r.id);val root=org.json.JSONObject(store.backup());root.getJSONArray("measurements").getJSONObject(0).getJSONArray("raw").getJSONArray(0).put(1,"bad");try{store.restore(root.toString());fail("Expected invalid input rejection")}catch(expected:Exception){};assertEquals(1,store.list().size);assertEquals(1,store.rawDir.listFiles()!!.size)}
  @Test fun renameDoesNotAlterSignal(){val r=record();write(r.id);val before=store.file(r.id).readBytes();store.rename(r.id,"Uusi nimi");assertArrayEquals(before,store.file(r.id).readBytes());assertEquals("Uusi nimi",store.list().single().name)}
+
+ private class FakeSource:SampleSource {
+  lateinit var callback:(Raw)->Unit
+  var stopped=false
+  override fun start(rate:Int,onSample:(Raw)->Unit):Boolean { callback=onSample;return true }
+  override fun stop(){stopped=true}
+ }
+ @Test fun acquisitionAutoFinishesAndPersistsRaw(){
+  val r=store.create("Automaattinen","Kone","DE","Radiaalinen","Jäykkä","",Config(seconds=1),"Fake",100.0)
+  val source=FakeSource();val capture=Capture(store,source)
+  var completed=0
+  capture.onFinished={record,samples,status->completed++;store.finish(record.id,Dsp.analyze(samples,record.config),status)}
+  capture.start(r)
+  repeat(300){source.callback(Raw(it*5000000L,sin(2*PI*25*it/200),0.0,9.81))}
+  assertEquals(1,completed);assertTrue(source.stopped);assertEquals(201,store.read(r.id).size);assertEquals("Valmis",store.list().single().status)
+ }
+ @Test fun manualStopFlushesAndDoesNotAcceptLaterSamples(){
+  val r=record();val source=FakeSource();val capture=Capture(store,source)
+  capture.onFinished={record,_,status->store.finish(record.id,null,status)}
+  capture.start(r);repeat(12){source.callback(Raw(it*5000000L,1.0,2.0,3.0))};capture.stop()
+  source.callback(Raw(1000000000L,1.0,2.0,3.0))
+  assertEquals(12,store.read(r.id).size);assertEquals("Keskeytetty",store.list().single().status)
+ }
 }

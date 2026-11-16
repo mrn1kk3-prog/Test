@@ -4,7 +4,7 @@ import org.junit.Assert.*
 import kotlin.math.*
 import java.util.Random
 class DspTest{
- private val cfg=Config(rate=1024,fft=1024,fmax=400.0,highpass=10.0,rpm=3000.0)
+ private val cfg=Config(rate=1000,fft=1024,fmax=400.0,highpass=10.0,rpm=3000.0)
  private fun raw(n:Int=4096,fn:(Double)->Double)=List(n){Raw(it*976562L,fn(it/1024.0),0.0,9.81)}
  @Test fun sine50And100(){for(f in listOf(50.0,100.0)){val a=Dsp.analyze(raw{2*sin(2*PI*f*it)},cfg);val k=a.peakSpectrum.indices.maxBy{a.peakSpectrum[it]};assertEquals(f,a.f[k],.01);assertEquals(2.0,a.peakSpectrum[k],.002);assertEquals(sqrt(2.0),a.rms,.001);assertEquals(sqrt(2.0)*1000/(2*PI*f),a.velocity,.1)}}
  @Test fun everyWindowHasCorrectToneGain(){for(w in listOf("Hann","Hamming","Blackman","Flat Top","Rectangular")){val a=Dsp.analyze(raw{sin(2*PI*50*it)},cfg.copy(window=w));assertEquals(w,1.0,a.peakSpectrum[50],.002)}}

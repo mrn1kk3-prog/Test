@@ -40,3 +40,11 @@ class Store(val context:Context):SQLiteOpenHelper(context,"ultimate-vibration.db
   }catch(e:Exception){staged.forEach{it.second.delete()};throw e}
  }
 }
+
+/** Restore the persisted spectral result; waveform remains backed by the original raw samples. */
+fun savedResult(text:String,waveform:DoubleArray):Result {
+ val j=JSONObject(text)
+ fun doubles(key:String):DoubleArray { val a=j.getJSONArray(key);return DoubleArray(a.length()){a.getDouble(it)} }
+ val warnings=j.getJSONArray("warnings");val findings=j.getJSONArray("findings")
+ return Result(j.getDouble("fs"),j.getDouble("jitter"),j.getInt("gaps"),j.getBoolean("clipped"),j.getInt("fft"),j.getInt("segments"),doubles("frequency"),doubles("peakSpectrum"),doubles("psd"),waveform,j.getDouble("rms"),j.getDouble("peak"),j.getDouble("p2p"),j.getDouble("kurtosis"),j.getDouble("skewness"),j.getDouble("velocity"),List(warnings.length()){warnings.getString(it)},List(findings.length()){val f=findings.getJSONObject(it);Finding(f.getString("title"),f.getString("evidence"),f.getString("confidence"),f.getString("recommendation"))})
+}

@@ -25,5 +25,14 @@ class UiSmokeTest {
   ui.onNodeWithText("SIMULOITU • 1X-esimerkki").assertExists()
   screenshot("history")
  }
- private fun screenshot(name:String){ui.onRoot().captureToImage().asAndroidBitmap().let{image->File(ui.activity.getExternalFilesDir(null),"$name.png").outputStream().use{image.compress(Bitmap.CompressFormat.PNG,100,it)}}}
+ private fun screenshot(name:String){
+  val values=android.content.ContentValues().apply {
+   put(android.provider.MediaStore.Images.Media.DISPLAY_NAME,"$name.png")
+   put(android.provider.MediaStore.Images.Media.MIME_TYPE,"image/png")
+   put(android.provider.MediaStore.Images.Media.RELATIVE_PATH,"Pictures/UVA")
+  }
+  val resolver=ui.activity.contentResolver
+  val uri=resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,values)!!
+  ui.onRoot().captureToImage().asAndroidBitmap().let{image->resolver.openOutputStream(uri)!!.use{image.compress(Bitmap.CompressFormat.PNG,100,it)}}
+ }
 }

@@ -61,7 +61,7 @@ jobs:
           disable-animations: true
           script: |
             gradle connectedDebugAndroidTest --stacktrace
-            adb pull /sdcard/Android/data/com.example.vibrationmonitor.v02/files ui-screenshots
+            adb pull /sdcard/Pictures/UVA ui-screenshots
       - uses: actions/upload-artifact@v4
         if: always()
         with:
